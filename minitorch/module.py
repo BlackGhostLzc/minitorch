@@ -31,13 +31,16 @@ class Module:
 
     def train(self) -> None:
         "Set the mode of this module and all descendent modules to `train`."
-        # TODO: Implement for Task 0.4.
-        raise NotImplementedError('Need to implement for Task 0.4')
+        # 递归
+        self.training = True
+        for m in self._modules.values():
+            m.train()
 
     def eval(self) -> None:
         "Set the mode of this module and all descendent modules to `eval`."
-        # TODO: Implement for Task 0.4.
-        raise NotImplementedError('Need to implement for Task 0.4')
+        self.training = False
+        for m in self._modules.values():
+            m.eval()
 
     def named_parameters(self) -> Sequence[Tuple[str, Parameter]]:
         """
@@ -47,13 +50,28 @@ class Module:
         Returns:
             The name and `Parameter` of each ancestor parameter.
         """
-        # TODO: Implement for Task 0.4.
-        raise NotImplementedError('Need to implement for Task 0.4')
+        # 结果列表
+        params: list[Tuple[str, Parameter]] = []
+        
+        # 1. 收集当前模块自己的参数
+        # _parameters 是字典 {name: Parameter}
+        for k, v in self._parameters.items():
+            params.append((k, v))
+        
+        # 2. 递归收集子模块的参数
+        # _modules 是字典 {module_name: Module}
+        for name, module in self._modules.items():
+            # 获取子模块的所有参数
+            child_params = module.named_parameters()
+            for n, p in child_params:
+                # 拼接名字：当前子模块名.参数名 (例如: layer1.weights)
+                params.append((f"{name}.{n}", p))
+
 
     def parameters(self) -> Sequence[Parameter]:
         "Enumerate over all the parameters of this module and its descendents."
-        # TODO: Implement for Task 0.4.
-        raise NotImplementedError('Need to implement for Task 0.4')
+        return [p for _, p in self.named_parameters()]
+
 
     def add_parameter(self, k: str, v: Any) -> Parameter:
         """
