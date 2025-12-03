@@ -66,8 +66,36 @@ def topological_sort(variable: Variable) -> Iterable[Variable]:
     Returns:
         Non-constant Variables in topological order starting from the right.
     """
-    # TODO: Implement for Task 1.4.
-    raise NotImplementedError('Need to implement for Task 1.4')
+    # 按计算图进行拓扑排序，返回Iterable[Variable]
+    # 参数 variable 是子节点，要向上追溯(通过variable.back ScalarHistory)
+    # is_leaf(): 判断是否是叶子节点
+    # is_constant(): 判断是否是常数  constant也会以scalar的形式添加进ScalarHistory中
+    
+    topological_order = []
+    visited = set()
+
+    def visit(var: Variable):
+        if var.unique_id in visited:
+            return
+        if var.is_constant():
+            return
+        
+        visited.add(var.unique_id)
+
+        if var.history is not None:
+            for input_var in var.parents:
+                visit(input_var)
+
+        # 父母节点都添加进去了，才把自己加进去
+        topological_order.append(var)
+
+    visit(variable)
+
+    return reversed(topological_order)
+
+
+
+    
 
 
 def backpropagate(variable: Variable, deriv: Any) -> None:
@@ -81,8 +109,41 @@ def backpropagate(variable: Variable, deriv: Any) -> None:
 
     No return. Should write to its results to the derivative values of each leaf through `accumulate_derivative`.
     """
-    # TODO: Implement for Task 1.4.
-    raise NotImplementedError('Need to implement for Task 1.4')
+    order = topological_sort(variable)
+    # 创建一个字典用来记录每一个 scalar variable 的梯度
+    grads = {}
+    # 为根节点记录梯度，一般是1.0
+    grads[variable.unique_id] = deriv
+    for var in order:
+        if var.unique_id not in grads:
+            grads[var.unique_id] = 0.0
+
+        d = grads[var.unique_id]
+        # 叶子节点需要把梯度保留下来（需要训练进行更新的参数）
+        if var.is_leaf():
+            var.accumulate_derivative(d)
+
+        # 中间节点
+        else:
+            if var.history is not None:
+                for v, grad in var.chain_rule(d):
+                    if v.is_constant():
+                        continue
+                    
+                    if v.unique_id not in grads:
+                        grads[v.unique_id] = 0.0
+
+                    grads[v.unique_id] += grad
+
+    
+
+
+
+    
+
+
+
+
 
 
 @dataclass
