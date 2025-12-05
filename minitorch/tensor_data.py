@@ -42,9 +42,13 @@ def index_to_position(index: Index, strides: Strides) -> int:
     Returns:
         Position in storage
     """
-
-    # TODO: Implement for Task 2.1.
-    raise NotImplementedError('Need to implement for Task 2.1')
+    # shape (2,3,4)       strides = [1,4,12]
+    # [1][2][3]
+    assert len(index) == len(strides)
+    position = 0
+    for i in range(len(index)):
+        position += index[i] * strides[i]
+    return position
 
 
 def to_index(ordinal: int, shape: Shape, out_index: OutIndex) -> None:
@@ -60,8 +64,14 @@ def to_index(ordinal: int, shape: Shape, out_index: OutIndex) -> None:
         out_index : return index corresponding to position.
 
     """
-    # TODO: Implement for Task 2.1.
-    raise NotImplementedError('Need to implement for Task 2.1')
+    # position -> index
+    # shape (2,3,4)    strides = (1,4,12)    
+    # position = 17    
+    for i in range(len(shape) - 1, -1, -1):
+        dim_size = shape[i]
+        out_index[i] = ordinal % dim_size
+        ordinal = ordinal // dim_size
+
 
 
 def broadcast_index(
@@ -83,8 +93,38 @@ def broadcast_index(
     Returns:
         None
     """
-    # TODO: Implement for Task 2.2.
-    raise NotImplementedError('Need to implement for Task 2.2')
+    # 大张量的维度不能少于小张量
+    assert len(big_shape) >= len(shape)
+
+    # 检查索引长度是否匹配对应的形状
+    assert len(big_index) == len(big_shape)
+    assert len(out_index) == len(shape)
+
+    # 检查广播规则兼容性，右对齐
+    # big_shape (3,4,5)     shape (1,5)
+    # big_index (2,3,2)    
+    # return [0,2]
+    offset = len(big_shape) - len(shape)
+    for i in range(len(shape)):
+        big_dim = big_shape[i + offset]
+        small_dim = shape[i]
+        # 规则：小维度必须是 1，或者两者必须相等
+        assert small_dim == 1 or small_dim == big_dim, \
+            f"Broadcasting mismatch at dim {i} (original) / {i+offset} (big): " \
+            f"shape {shape} cannot be broadcast to {big_shape}. " \
+            f"Dimension {small_dim} is not 1 and does not match {big_dim}."
+
+    for i in range(len(shape)):
+        if shape[i] == 1:
+            # 原始维度是 1 (被广播拉伸了)
+            # 无论大张量的索引是多少，回到原始数据里，它都在位置 0
+            out_index[i] = 0
+        else:
+            # 原始维度 > 1 (没有被拉伸)
+            # 直接取大张量对应位置的索引
+            out_index[i] = big_index[i + offset]
+
+
 
 
 def shape_broadcast(shape1: UserShape, shape2: UserShape) -> UserShape:
@@ -101,8 +141,33 @@ def shape_broadcast(shape1: UserShape, shape2: UserShape) -> UserShape:
     Raises:
         IndexingError : if cannot broadcast
     """
-    # TODO: Implement for Task 2.2.
-    raise NotImplementedError('Need to implement for Task 2.2')
+    a, b = shape1, shape2
+    m = max(len(a), len(b))
+    
+    # 2. 左侧补 1 (Padding) 以便对齐
+    # (2, 3) -> (1, 2, 3)
+    if len(a) < m:
+        a = (1,) * (m - len(a)) + a
+    if len(b) < m:
+        b = (1,) * (m - len(b)) + b
+    
+    # 3. 逐位比较并构建结果形状
+    out_shape = []
+    for i in range(m):
+        d1 = a[i]
+        d2 = b[i]
+        
+        if d1 == d2:
+            out_shape.append(d1)
+        elif d1 == 1:
+            out_shape.append(d2)
+        elif d2 == 1:
+            out_shape.append(d1)
+        else:
+            # 如果既不相等，也没人是 1，说明冲突了
+            raise IndexingError(f"Shapes {shape1} and {shape2} are not broadcastable")
+            
+    return tuple(out_shape)
 
 
 def strides_from_shape(shape: UserShape) -> UserStrides:
@@ -227,8 +292,11 @@ class TensorData:
             range(len(self.shape))
         ), f"Must give a position to each dimension. Shape: {self.shape} Order: {order}"
 
-        # TODO: Implement for Task 2.1.
-        raise NotImplementedError('Need to implement for Task 2.1')
+        # 只需要改变一下 shape 和 stride，不需要修改 storage
+        new_shape = tuple(self.shape[i] for i in order)
+        new_strides = tuple(self.strides[i] for i in order)
+        return TensorData(self._storage, new_shape, new_strides)
+       
 
     def to_string(self) -> str:
         s = ""

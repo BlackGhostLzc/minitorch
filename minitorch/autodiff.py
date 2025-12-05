@@ -137,15 +137,6 @@ def backpropagate(variable: Variable, deriv: Any) -> None:
 
     
 
-
-
-    
-
-
-
-
-
-
 @dataclass
 class Context:
     """

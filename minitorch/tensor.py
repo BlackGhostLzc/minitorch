@@ -177,9 +177,20 @@ class Tensor:
 
     def __radd__(self, b: TensorLike) -> Tensor:
         return self + b
+    
+    def __rsub__(self, b: TensorLike) -> Tensor:
+        """
+        实现反向减法逻辑: b - self
+        当执行 1.0 - tensor 时会被调用
+        """
+        # 1. 把 b (比如 1.0) 转换成 Tensor
+        # 2. 调用正常的减法: Tensor(1.0) - self
+        return self._ensure_tensor(b) - self
 
     def __rmul__(self, b: TensorLike) -> Tensor:
         return self * b
+    
+
 
     def all(self, dim: Optional[int] = None) -> Tensor:
         if dim is None:

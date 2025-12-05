@@ -257,15 +257,37 @@ def tensor_map(
     """
 
     def _map(
-        out: Storage,
+        out: Storage,                   
         out_shape: Shape,
         out_strides: Strides,
         in_storage: Storage,
         in_shape: Shape,
         in_strides: Strides,
     ) -> None:
-        # TODO: Implement for Task 2.3.
-        raise NotImplementedError('Need to implement for Task 2.3')
+        # Implement for Task 2.3.
+        # b = a + 1     b = a.exp()    
+        # 可能需要进行广播，比如说b的shape为(2,3,4),a的shape为(1,3),输出tensor > 输入tensor  
+
+        out_index = np.zeros(len(out_shape), dtype=np.int32)
+        in_index = np.zeros(len(in_shape), dtype=np.int32)
+
+        length = len(out)
+        for i in range(length):
+            # tensor out 在一维 storage 中的第 i 个元素
+            # ---->  对应的 index 是  
+            to_index(i, out_shape, out_index)
+            
+            # 广播机制
+            # 找到 in_storage 的 index
+            broadcast_index(out_index, out_shape, in_shape, in_index)
+
+            # 前面的 i 只是遍历每一个元素，这里需要严格遵循 strides
+            out_pos = index_to_position(out_index, out_strides)
+            in_pos  = index_to_position(in_index,  in_strides)
+
+            x = in_storage[in_pos]
+            y = fn(x)
+            out[out_pos] = y
 
     return _map
 
@@ -309,8 +331,29 @@ def tensor_zip(
         b_shape: Shape,
         b_strides: Strides,
     ) -> None:
-        # TODO: Implement for Task 2.3.
-        raise NotImplementedError('Need to implement for Task 2.3')
+        # Implement for Task 2.3.
+        # 广播机制的二元运算符
+        # a (2,3,4)   b(1,4)  -> out (2,3,4)
+        len_out = len(out)
+
+        out_index = np.zeros(len(out_shape), dtype=np.int32)
+        a_index = np.zeros(len(a_shape), dtype=np.int32)
+        b_index = np.zeros(len(b_shape), dtype=np.int32)
+
+        for i in range(len_out):
+            # 计算 out(一维storage) 中**逻辑上Ordinal**的第 i 个元素(并不是物理上的第 i 个元素)
+            to_index(i, out_shape, out_index)
+            out_pos = index_to_position(out_index, out_strides)
+
+            # broadcast: 计算 a 和 b 相应的 index   
+            broadcast_index(out_index, out_shape, a_shape, a_index)
+            broadcast_index(out_index, out_shape, b_shape, b_index)
+
+            # 计算 a_pos, b_pos
+            a_pos = index_to_position(a_index, a_strides)
+            b_pos = index_to_position(b_index, b_strides)
+
+            out[out_pos] = fn(a_storage[a_pos], b_storage[b_pos])
 
     return _zip
 
@@ -340,8 +383,53 @@ def tensor_reduce(
         a_strides: Strides,
         reduce_dim: int,
     ) -> None:
-        # TODO: Implement for Task 2.3.
-        raise NotImplementedError('Need to implement for Task 2.3')
+        # Implement for Task 2.3.
+
+        # out 和 a 的 shape除了 reduce_dim 其他都是一样的
+        assert out_shape[reduce_dim] == 1
+        # a (2,3,4)   reduce_dim = 1    ->    out (2,1,4)
+
+        # 1. 准备工作
+        len_out = len(out) 
+        # 获取要 reduce 的那个维度的大小
+        reduce_size = a_shape[reduce_dim]
+        
+        # 只需要一个 index 缓冲区，因为 a 和 out 的维度数是一样的
+        # 我们可以在循环中复用它
+        out_index = np.zeros(len(out_shape), dtype=np.int32)
+
+        # 2. 外层循环：遍历每一个输出位置
+        for i in range(len_out):
+            # 计算当前输出位置的逻辑坐标
+            to_index(i, out_shape, out_index)
+            
+            # 计算输出的物理位置
+            out_pos = index_to_position(out_index, out_strides)
+            
+            # C. 内层循环：遍历 reduction 维度
+            # out_index 当前在 reduce_dim 上的值肯定是 0 (因为 out_shape 对应维是 1)
+            # 我们需要让它从 0 变到 reduce_size - 1，去访问 input 的所有对应元素
+            
+            # 这里的 temp_val 用于暂存 accumulator，避免频繁读写 out[out_pos]
+            # (不过直接写 out[out_pos] 逻辑也是对的，取决于具体实现偏好，这里直接读写 out 更直观)
+            
+            for j in range(reduce_size):
+                # 关键操作：修改坐标的第 reduce_dim 维
+                # 把它变成 j，这样 out_index 就变成了对应的 a_index
+                out_index[reduce_dim] = j
+                
+                # 计算输入的物理位置
+                a_pos = index_to_position(out_index, a_strides)
+                
+                # 读取输入数据
+                val_a = a_storage[a_pos]
+                
+                # 读取当前的累积结果 (初始值在 reduce 函数里已经填好了)
+                current_val = out[out_pos]
+                
+                # 执行计算 (例如: new_sum = old_sum + val_a)
+                out[out_pos] = fn(current_val, val_a)
+
 
     return _reduce
 

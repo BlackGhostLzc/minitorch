@@ -165,7 +165,7 @@ class Scalar:
 
         op = h.last_fn
         inputs = h.inputs
-        grads = op.backward(h.ctx, d_output)
+        grads = op._backward(h.ctx, d_output)
 
         return zip(inputs, grads)
 
